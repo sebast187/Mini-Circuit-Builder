@@ -1,0 +1,1313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Circuit Builder V5.1 (Draw Func Fix)</title>
+    <style>
+        :root {
+            --sim-bg-color: #f0f4f8; 
+            --sim-panel-bg: #ffffff; 
+            --sim-toolbar-bg: #e9edf1;
+            --sim-accent-color: #ff6b6b; 
+            --sim-highlight-color: #4ecdc4; 
+            --sim-interactive-color: #45a0fc; 
+            --sim-text-color: #2c3e50; 
+            --sim-text-muted-color: #7f8c8d; 
+            --sim-border-color: #ccd1d9;
+            --wire-color: #3498db; 
+            --wire-pending-color: #9b59b6; 
+            --component-stroke-color: #34495e;
+            --terminal-color: #e74c3c; 
+            --terminal-hover-color: #f1c40f; 
+            --electron-color: #f39c12; 
+            --node-color: #8e44ad; 
+            --node-hover-color: #c0392b; 
+            --meter-case-color: #7f8c8d; 
+            --meter-screen-color: #ecf0f1; 
+        }
+
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--sim-bg-color);
+            color: var(--sim-text-color);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .main-container { 
+            display: flex;
+            width: 95%;
+            max-width: 1500px; 
+            margin-top: 20px;
+            gap: 20px;
+        }
+
+        .toolbar { 
+            background-color: var(--sim-toolbar-bg);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
+            height: fit-content;
+            min-width: 130px; 
+        }
+
+        .toolbar button { 
+            background-color: var(--sim-interactive-color);
+            color: white;
+            border: none;
+            padding: 10px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background-color 0.2s ease;
+            width: 100%;
+            text-align: center;
+        }
+        .toolbar button.active, .toolbar button:hover { 
+            background-color: var(--sim-highlight-color);
+        }
+        .toolbar button.tool-active {  
+             background-color: var(--sim-accent-color);
+             color: white;
+        }
+        .toolbar h3 { 
+            margin: 10px 0 5px 0;
+            font-size: 1.1em;
+            color: var(--sim-text-color);
+        }
+        .toolbar h3:first-child { margin-top: 0;}
+
+        .canvas-container { 
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #circuitCanvas { 
+            border: 2px solid var(--sim-border-color);
+            background-color: var(--sim-panel-bg);
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            cursor: crosshair; 
+        }
+        #circuitCanvas.dragging { cursor: grabbing; }
+        #circuitCanvas.selectable { cursor: pointer; }
+
+
+        .properties-panel, .simulation-output { 
+            background-color: var(--sim-panel-bg);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            width: 280px; 
+            min-width: 280px; 
+            height: fit-content;
+        }
+        .properties-panel h3, .simulation-output h3 { 
+            margin: 0 0 15px 0;
+            font-size: 1.1em;
+            color: var(--sim-text-color);
+            border-bottom: 1px solid var(--sim-border-color);
+            padding-bottom: 8px;
+        }
+        .properties-panel label { 
+            display: block;
+            margin: 10px 0 5px 0;
+            font-size: 0.9em;
+            color: var(--sim-text-muted-color);
+        }
+        .properties-panel input[type="number"],
+        .properties-panel input[type="text"] { 
+            width: calc(100% - 22px); 
+            padding: 8px 10px;
+            border: 1px solid var(--sim-border-color);
+            border-radius: 4px;
+            font-size: 0.9em;
+            background-color: var(--sim-bg-color);
+            color: var(--sim-text-color);
+            box-sizing: border-box;
+        }
+        .properties-panel p { 
+            font-size: 0.9em;
+            color: var(--sim-text-muted-color);
+        }
+         .properties-panel button { 
+            background-color: var(--sim-interactive-color);
+            color: white;
+            border: none;
+            padding: 8px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            margin-top: 10px;
+            width: 100%;
+        }
+        .properties-panel button.toggle-active { 
+            background-color: var(--sim-highlight-color);
+        }
+        .properties-panel button:hover { 
+            background-color: var(--sim-highlight-color); opacity: 0.8;
+        }
+
+        .simulation-output p { 
+            font-size: 0.9em;
+            margin: 8px 0;
+        }
+        .simulation-output code { 
+            font-family: 'Courier New', Courier, monospace;
+            background-color: var(--sim-toolbar-bg);
+            padding: 2px 5px;
+            border-radius: 3px;
+            color: var(--sim-accent-color);
+        }
+
+        .info-bar { 
+            margin-top: 10px;
+            padding: 10px;
+            background-color: var(--sim-toolbar-bg);
+            border-radius: 6px;
+            font-size: 0.9em;
+            text-align: center;
+            width: calc(100% - 20px); 
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="toolbar">
+            <h3>Tools</h3>
+            <button id="tool-select" title="Select/Move Tool (V)">Select (V)</button>
+            <button id="tool-wire" title="Wire Tool (W)">Wire (W)</button>
+            <button id="tool-node" title="Place Node/Junction (J)">Node (J)</button>
+            <h3>Passive Components</h3>
+            <button id="tool-resistor" data-component="Resistor">Resistor</button>
+            <button id="tool-capacitor" data-component="Capacitor">Capacitor</button>
+            <button id="tool-switch" data-component="Switch">Switch</button>
+            <h3>Active/Sources</h3>
+            <button id="tool-vsource" data-component="VSource">Voltage Src</button>
+            <button id="tool-led" data-component="LED">LED</button>
+            <button id="tool-gnd" data-component="Ground">Ground</button>
+            <h3>Meters</h3>
+            <button id="tool-ammeter" data-component="Ammeter">Ammeter</button>
+            <button id="tool-voltmeter" data-component="Voltmeter">Voltmeter</button>
+             <h3>Actions</h3>
+            <button id="action-delete" title="Delete Selected (Del/Backspace)">Delete</button>
+            <button id="action-clear" title="Clear Canvas">Clear All</button>
+        </div>
+
+        <div class="canvas-container">
+            <canvas id="circuitCanvas" width="800" height="600"></canvas>
+            <div class="info-bar" id="infoBar">Select a tool or component to start.</div>
+        </div>
+
+        <div class="side-panel">
+            <div class="properties-panel" id="propertiesPanel">
+                <h3>Properties</h3>
+                <p id="noSelectionText">No item selected.</p>
+                <div id="selectedItemProps" style="display:none;">
+                    <label for="prop-id">ID:</label>
+                    <input type="text" id="prop-id" readonly>
+                    
+                    <div id="componentSpecificProps">
+                        <label for="prop-value">Value:</label>
+                        <input type="number" id="prop-value" step="any">
+                        <span id="prop-unit"></span>
+                        <button id="prop-rotate">Rotate (R)</button>
+                        <div id="switchSpecificProps" style="display:none;">
+                             <button id="prop-switch-toggle">Toggle Switch</button>
+                        </div>
+                    </div>
+
+                    <div id="nodeSpecificProps" style.display="none;">
+                        <p>This is a connection node.</p>
+                    </div>
+                    <div id="meterSpecificProps" style.display="none;">
+                        <p>Reading: <code id="meter-reading">N/A</code></p>
+                    </div>
+                </div>
+            </div>
+            <div class="simulation-output" style="margin-top:20px;">
+                <h3>Simulation (DC Series Attempt)</h3>
+                <p>Main Path Current: <code id="sim-current">N/A</code></p>
+                <p>Status: <code id="sim-status">Build a circuit.</code></p>
+                <div id="component-voltages"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('circuitCanvas');
+        const ctx = canvas.getContext('2d');
+        const infoBar = document.getElementById('infoBar');
+
+        // --- State Variables ---
+        let components = [];
+        let wires = [];
+        let nodes = []; 
+        let nextItemId = 1; 
+        let selectedTool = 'select'; 
+        let selectedItem = null; 
+        let hoveredConnectable = null; 
+        let wiringState = { active: false, startItem: null, points: [], currentEndPoint: {x:0, y:0} };
+        let draggingItem = null; 
+        let dragStartOffset = { x: 0, y: 0};
+        const gridSize = 20;
+        const terminalRadius = 6;
+        const nodeRadius = 7;
+
+        let electrons = [];
+        const electronSpeedFactor = 0.5;
+
+        // --- Component Definitions & Drawing --- 
+        const componentSpecs = {
+            VSource: { width: 60, height: 60, color: '#f1c40f', terminals: [{ x: 0, y: -30, id: 'p' }, { x: 0, y: 30, id: 'n' }], defaultValue: 9, unit: 'V', label: 'V' },
+            Resistor: { width: 80, height: 30, color: '#bdc3c7', terminals: [{ x: -40, y: 0, id: 't1' }, { x: 40, y: 0, id: 't2' }], defaultValue: 100, unit: 'Ω', label: 'R' },
+            LED: { width: 50, height: 50, color: '#e74c3c', terminals: [{ x: -25, y: 0, id: 'a' }, { x: 25, y: 0, id: 'k' }], defaultValue: 2, unit: 'Vf', label: 'LED' },
+            Capacitor: { width: 50, height: 50, color: '#3498db', terminals: [{x: -25, y: 0, id: 't1'}, {x: 25, y: 0, id: 't2'}], defaultValue: 100e-6, unit: 'F', label: 'C' },
+            Switch: {width: 60, height: 30, color: '#7f8c8d', terminals: [{x: -30, y: 0, id: 't1'}, {x: 30, y: 0, id: 't2'}], defaultValue: 0, unit: '', label: 'SW', 
+                     defaultState: { isOpen: true } }, 
+            Ammeter: { width: 60, height: 60, color: '#f39c12', terminals: [{x: -30, y: 0, id: 'in'}, {x: 30, y: 0, id: 'out'}], defaultValue: 0, unit: 'A', label: 'A',
+                       defaultState: { reading: 0 }},
+            Voltmeter: { width: 60, height: 60, color: '#9b59b6', terminals: [{x: 0, y: -30, id: 'p'}, {x: 0, y: 30, id: 'n'}], defaultValue: 0, unit: 'V', label: 'V',
+                         defaultState: { reading: 0 }}, 
+            Ground: { width: 40, height: 40, color: '#2ecc71', terminals: [{ x: 0, y: -20, id: 'gnd' }], defaultValue: 0, unit: '', label: 'GND' }
+        };
+        
+        function drawVSource(comp, spec) { 
+            ctx.strokeStyle = 'var(--component-stroke-color)'; ctx.lineWidth = 2;
+            ctx.fillStyle = spec.color; 
+            ctx.beginPath();
+            ctx.arc(0, 0, spec.width / 2 * 0.8, 0, Math.PI * 2);
+            ctx.fill(); ctx.stroke();
+            ctx.fillStyle = 'var(--component-stroke-color)'; ctx.font = '16px Arial'; ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('+', 0, -spec.height / 4.5);
+            ctx.fillText('-', 0, spec.height / 4.5);
+            ctx.save();
+            ctx.resetTransform(); 
+            ctx.translate(comp.x, comp.y); 
+            ctx.fillStyle = 'var(--component-stroke-color)'; ctx.font = '12px Arial'; ctx.textAlign = 'center';
+            ctx.fillText(`${formatValue(comp.value, spec.unit)}${spec.unit}`, 0, spec.height/2 + 15);
+            ctx.restore(); 
+        }
+        function drawResistor(comp, spec) { 
+            ctx.strokeStyle = 'var(--component-stroke-color)'; ctx.lineWidth = 2;
+            ctx.fillStyle = spec.color;
+            ctx.fillRect(-spec.width/2 + 10, -spec.height/2, spec.width - 20, spec.height);
+            ctx.strokeRect(-spec.width/2 + 10, -spec.height/2, spec.width - 20, spec.height);
+            ctx.beginPath(); 
+            ctx.moveTo(-spec.width/2, 0); ctx.lineTo(-spec.width/2+10, 0);
+            ctx.moveTo(spec.width/2-10, 0); ctx.lineTo(spec.width/2, 0);
+            ctx.stroke();
+            
+            ctx.save(); ctx.resetTransform(); ctx.translate(comp.x, comp.y);
+            ctx.fillStyle = 'var(--component-stroke-color)'; ctx.font = '12px Arial'; ctx.textAlign = 'center';
+            ctx.fillText(`${formatValue(comp.value, spec.unit)}${spec.unit}`, 0, spec.height/2 + 15);
+            if (comp.voltageDrop && Math.abs(comp.voltageDrop) > 0.001) {
+                 ctx.fillStyle = 'var(--sim-interactive-color)';
+                 const angle = comp.rotation % 180;
+                 const yOffset = (angle === 0) ? -spec.height/2 - 8 : spec.width/2 + 8;
+                 const xOffset = (angle === 90) ? -spec.height/2 -15 : 0;
+                 ctx.fillText(`${comp.voltageDrop.toFixed(2)}V`, xOffset, yOffset);
+            }
+            ctx.restore();
+        }
+        function drawLED(comp, spec) { 
+            ctx.strokeStyle = 'var(--component-stroke-color)'; ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-spec.width/2 + 5, -spec.height/3); 
+            ctx.lineTo(-spec.width/2 + 5, spec.height/3);
+            ctx.lineTo(0, 0); 
+            ctx.closePath();
+            
+            let ledColor = 'rgba(100,100,100,0.5)'; 
+            if (comp.brightness > 0) ledColor = `rgba(255, 0, 0, ${0.2 + comp.brightness * 0.8})`;
+            ctx.fillStyle = ledColor;
+            ctx.fill(); ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(spec.width/2 - 10, -spec.height/3);
+            ctx.lineTo(spec.width/2 - 10, spec.height/3);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(-spec.width/2, 0); ctx.lineTo(-spec.width/2+5, 0);
+            ctx.moveTo(spec.width/2-10, 0); ctx.lineTo(spec.width/2, 0);
+            ctx.stroke();
+
+            ctx.save(); ctx.resetTransform(); ctx.translate(comp.x, comp.y);
+            ctx.fillStyle = 'var(--component-stroke-color)'; ctx.font = '12px Arial'; ctx.textAlign = 'center';
+            ctx.fillText(`${spec.label} (Vf:${comp.value}V)`, 0, spec.height/2 + 15);
+             if (comp.voltageDrop && Math.abs(comp.voltageDrop) > 0.001) {
+                 ctx.fillStyle = 'var(--sim-interactive-color)';
+                 const angle = comp.rotation % 180;
+                 const yOffset = (angle === 0) ? -spec.height/2 - 8 : spec.width/2 + 8;
+                 const xOffset = (angle === 90) ? -spec.height/2 -15 : 0;
+                 ctx.fillText(`${comp.voltageDrop.toFixed(2)}V`, xOffset, yOffset);
+            }
+            ctx.restore();
+        }
+        function drawCapacitor(comp, spec) { 
+            ctx.strokeStyle = 'var(--component-stroke-color)'; ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-spec.width/2, 0); ctx.lineTo(-spec.width/2 + 15, 0); 
+            ctx.moveTo(spec.width/2, 0);  ctx.lineTo(spec.width/2 - 15, 0);   
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(-spec.width/2 + 15, -spec.height/2 + 5); ctx.lineTo(-spec.width/2 + 15, spec.height/2 - 5); 
+            ctx.moveTo(spec.width/2 - 15, -spec.height/2 + 5);  ctx.lineTo(spec.width/2 - 15, spec.height/2 - 5);   
+            ctx.stroke();
+            
+            ctx.save(); ctx.resetTransform(); ctx.translate(comp.x, comp.y);
+            ctx.fillStyle = 'var(--component-stroke-color)'; ctx.font = '12px Arial'; ctx.textAlign = 'center';
+            ctx.fillText(`${formatValue(comp.value, spec.unit)}${spec.unit}`, 0, spec.height/2 + 15);
+            if (comp.voltageDrop && Math.abs(comp.voltageDrop) > 0.001) { 
+                 ctx.fillStyle = 'var(--sim-interactive-color)';
+                 const angle = comp.rotation % 180;
+                 const yOffset = (angle === 0) ? -spec.height/2 - 8 : spec.width/2 + 8;
+                 const xOffset = (angle === 90) ? -spec.height/2 -15 : 0;
+                 ctx.fillText(`${comp.voltageDrop.toFixed(2)}V`, xOffset, yOffset);
+            }
+            ctx.restore();
+        }
+        function drawSwitch(comp, spec) {
+            ctx.strokeStyle = 'var(--component-stroke-color)'; ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(-spec.width/2 + 5, 0, 3, 0, Math.PI*2); 
+            ctx.arc(spec.width/2 - 5, 0, 3, 0, Math.PI*2); 
+            ctx.fillStyle = 'var(--component-stroke-color)'; 
+            ctx.fill();
+            ctx.beginPath(); 
+            ctx.moveTo(-spec.width/2, 0); ctx.lineTo(-spec.width/2 + 5, 0);
+            ctx.moveTo(spec.width/2, 0); ctx.lineTo(spec.width/2 - 5, 0);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(-spec.width/2 + 5, 0); 
+            if (comp.state.isOpen) {
+                ctx.lineTo(0, -spec.height/2 + 5); 
+            } else {
+                ctx.lineTo(spec.width/2 - 5, 0); 
+            }
+            ctx.stroke();
+            
+            ctx.save(); ctx.resetTransform(); ctx.translate(comp.x, comp.y);
+            ctx.fillStyle = 'var(--component-stroke-color)'; ctx.font = '12px Arial'; ctx.textAlign = 'center';
+            ctx.fillText(comp.state.isOpen ? 'Open' : 'Closed', 0, spec.height/2 + 15);
+            ctx.restore();
+        }
+        function drawAmmeter(comp, spec) {
+            ctx.strokeStyle = 'var(--component-stroke-color)'; ctx.lineWidth = 2;
+            ctx.fillStyle = 'var(--meter-case-color)';
+            ctx.beginPath();
+            ctx.arc(0,0, spec.width/2, 0, Math.PI * 2); 
+            ctx.fill(); ctx.stroke();
+            
+            ctx.fillStyle = 'var(--meter-screen-color)';
+            ctx.fillRect(-spec.width/3, -spec.height/4, spec.width*2/3, spec.height/2);
+            ctx.strokeRect(-spec.width/3, -spec.height/4, spec.width*2/3, spec.height/2);
+
+            ctx.fillStyle = 'var(--component-stroke-color)'; ctx.font = 'bold 14px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(spec.label, 0, 0); 
+            
+            ctx.save(); ctx.resetTransform(); ctx.translate(comp.x, comp.y); 
+            ctx.fillStyle = 'var(--component-stroke-color)'; ctx.font = '10px Courier New'; ctx.textAlign = 'center';
+            ctx.fillText(`${formatValue(comp.state.reading, spec.unit)}${spec.unit}`, 0, spec.height/2 + 12);
+            ctx.restore();
+        }
+        function drawVoltmeter(comp, spec) { 
+            ctx.strokeStyle = 'var(--component-stroke-color)'; ctx.lineWidth = 2;
+            ctx.fillStyle = 'var(--meter-case-color)';
+            ctx.beginPath();
+            ctx.arc(0,0, spec.width/2, 0, Math.PI * 2);
+            ctx.fill(); ctx.stroke();
+            
+            ctx.fillStyle = 'var(--meter-screen-color)';
+            ctx.fillRect(-spec.width/3, -spec.height/4, spec.width*2/3, spec.height/2);
+            ctx.strokeRect(-spec.width/3, -spec.height/4, spec.width*2/3, spec.height/2);
+
+            ctx.fillStyle = 'var(--component-stroke-color)'; ctx.font = 'bold 14px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(spec.label, 0, 0); 
+            
+            ctx.save(); ctx.resetTransform(); ctx.translate(comp.x, comp.y);
+            ctx.fillStyle = 'var(--component-stroke-color)'; ctx.font = '10px Courier New'; ctx.textAlign = 'center';
+            ctx.fillText(`${formatValue(comp.state.reading, spec.unit)}${spec.unit}`, 0, spec.height/2 + 12);
+            ctx.restore();
+        }
+        function drawGround(comp, spec) { 
+            ctx.strokeStyle = 'var(--component-stroke-color)'; ctx.lineWidth = 2;
+            ctx.fillStyle = spec.color;
+            ctx.beginPath();
+            ctx.moveTo(0, -spec.height/2); 
+            ctx.lineTo(0, 0); 
+            ctx.moveTo(-spec.width/2 + 5, 0); ctx.lineTo(spec.width/2 - 5, 0); 
+            ctx.moveTo(-spec.width/2 + 10, spec.height/4); ctx.lineTo(spec.width/2 - 10, spec.height/4);
+            ctx.moveTo(-spec.width/2 + 15, spec.height/2); ctx.lineTo(spec.width/2 - 15, spec.height/2); 
+            ctx.stroke();
+            
+            ctx.save(); ctx.resetTransform(); ctx.translate(comp.x, comp.y);
+            ctx.fillStyle = 'var(--component-stroke-color)'; ctx.font = '12px Arial'; ctx.textAlign = 'center';
+            ctx.fillText(spec.label, 0, spec.height/2 + 10);
+            ctx.restore();
+        }
+
+        // CORRECTED drawFunctions object
+        const drawFunctions = { 
+            VSource: drawVSource, 
+            Resistor: drawResistor, 
+            LED: drawLED, 
+            Capacitor: drawCapacitor, 
+            Switch: drawSwitch, 
+            Ammeter: drawAmmeter, 
+            Voltmeter: drawVoltmeter, 
+            Ground: drawGround 
+        };
+
+
+        function getAbsTerminalPos(component, terminalId) { 
+            const termSpec = component.spec.terminals.find(t => t.id === terminalId);
+            if (!termSpec) return { x: component.x, y: component.y }; 
+
+            const angleRad = component.rotation * Math.PI / 180;
+            const cosA = Math.cos(angleRad);
+            const sinA = Math.sin(angleRad);
+
+            const rotatedX = termSpec.x * cosA - termSpec.y * sinA;
+            const rotatedY = termSpec.x * sinA + termSpec.y * cosA;
+
+            return { x: component.x + rotatedX, y: component.y + rotatedY };
+        }
+        
+        function drawComponent(comp) { 
+            ctx.save();
+            ctx.translate(comp.x, comp.y); 
+            ctx.rotate(comp.rotation * Math.PI / 180); 
+
+            if (drawFunctions[comp.type]) { // Check if draw function exists
+                 drawFunctions[comp.type](comp, comp.spec); 
+            } else {
+                console.error("No draw function for component type:", comp.type);
+            }
+            
+            comp.spec.terminals.forEach(term => {
+                ctx.beginPath();
+                ctx.arc(term.x, term.y, terminalRadius, 0, Math.PI * 2);
+                const isHovered = hoveredConnectable && hoveredConnectable.type === 'terminal' && 
+                                  hoveredConnectable.componentId === comp.id && hoveredConnectable.terminalId === term.id;
+                ctx.fillStyle = isHovered ? 'var(--terminal-hover-color)' : 'var(--terminal-color)';
+                ctx.fill();
+            });
+            ctx.restore(); 
+
+            if (selectedItem && selectedItem.itemType === 'component' && selectedItem.id === comp.id) {
+                ctx.strokeStyle = 'var(--sim-highlight-color)';
+                ctx.lineWidth = 2;
+                const w = comp.spec.width; const h = comp.spec.height;
+                const angle = comp.rotation % 180; 
+                const displayW = (angle === 0) ? w : h;
+                const displayH = (angle === 0) ? h : w;
+                ctx.strokeRect(comp.x - displayW/2 - 5, comp.y - displayH/2 - 5, displayW + 10, displayH + 10);
+            }
+        }
+        function drawNode(node) { 
+            ctx.beginPath();
+            ctx.arc(node.x, node.y, nodeRadius, 0, Math.PI * 2);
+            const isHovered = hoveredConnectable && hoveredConnectable.type === 'node' && hoveredConnectable.id === node.id;
+            ctx.fillStyle = isHovered ? 'var(--node-hover-color)' : 'var(--node-color)';
+            ctx.fill();
+            if (selectedItem && selectedItem.itemType === 'node' && selectedItem.id === node.id) {
+                ctx.strokeStyle = 'var(--sim-highlight-color)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(node.x - nodeRadius - 3, node.y - nodeRadius - 3, nodeRadius*2 + 6, nodeRadius*2 + 6);
+            }
+        }
+        function drawWires() { 
+            wires.forEach(wire => {
+                if (wire.points.length < 2) return;
+                ctx.beginPath();
+                ctx.moveTo(wire.points[0].x, wire.points[0].y);
+                for (let i = 1; i < wire.points.length; i++) {
+                    ctx.lineTo(wire.points[i].x, wire.points[i].y);
+                }
+                ctx.strokeStyle = 'var(--wire-color)';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+            });
+
+            if (wiringState.active && wiringState.points.length > 0) {
+                ctx.beginPath();
+                const lastPoint = wiringState.points[wiringState.points.length - 1];
+                ctx.moveTo(lastPoint.x, lastPoint.y);
+                ctx.lineTo(wiringState.currentEndPoint.x, wiringState.currentEndPoint.y);
+                ctx.strokeStyle = 'var(--wire-pending-color)';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+        function drawElectrons() { 
+            electrons.forEach(e => {
+                ctx.beginPath();
+                ctx.arc(e.x, e.y, 3, 0, Math.PI * 2);
+                ctx.fillStyle = 'var(--electron-color)';
+                ctx.fill();
+            });
+        }
+
+        function redrawCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            nodes.forEach(drawNode);
+            components.forEach(drawComponent); 
+            drawWires();
+            drawElectrons();
+        }
+
+        // --- UI & Interaction ---
+        function updateToolbarButtons() { 
+            document.querySelectorAll('.toolbar button[data-component], #tool-select, #tool-wire, #tool-node').forEach(btn => {
+                btn.classList.remove('tool-active');
+                if ((btn.dataset.component && btn.dataset.component === selectedTool) || (btn.id === `tool-${selectedTool}`)) {
+                    btn.classList.add('tool-active');
+                }
+            });
+            let toolInfo = `Tool: ${selectedTool}.`;
+            if (selectedTool === 'wire') toolInfo += " Click terminal/node or empty space for joints.";
+            else if (componentSpecs[selectedTool] || selectedTool === 'Node') toolInfo += " Click canvas to place.";
+            else toolInfo += " Click item to select/drag.";
+            infoBar.textContent = toolInfo;
+        }
+        function setActiveTool(toolName) { 
+            selectedTool = toolName;
+            selectedItem = null; 
+            updatePropertiesPanel();
+            if (wiringState.active) { 
+                wiringState.active = false;
+                wiringState.points = [];
+            }
+            updateToolbarButtons();
+        }
+
+        document.getElementById('tool-select').addEventListener('click', () => setActiveTool('select'));
+        document.getElementById('tool-wire').addEventListener('click', () => setActiveTool('wire'));
+        document.getElementById('tool-node').addEventListener('click', () => setActiveTool('Node')); 
+        document.querySelectorAll('.toolbar button[data-component]').forEach(btn => {
+            btn.addEventListener('click', () => setActiveTool(btn.dataset.component));
+        });
+        document.getElementById('action-delete').addEventListener('click', deleteSelected);
+        document.getElementById('action-clear').addEventListener('click', () => {
+            components = []; wires = []; nodes = []; electrons = []; nextItemId = 1; 
+            selectedItem = null; wiringState.active = false; wiringState.points = [];
+            updatePropertiesPanel(); simulateCircuit(); redrawCanvas();
+        });
+
+        function getMousePos(evt, doSnap = true) { 
+            const rect = canvas.getBoundingClientRect();
+            const rawX = evt.clientX - rect.left;
+            const rawY = evt.clientY - rect.top;
+            if (doSnap) {
+                return {
+                    x: Math.round(rawX / gridSize) * gridSize,
+                    y: Math.round(rawY / gridSize) * gridSize,
+                    rawX: rawX, rawY: rawY
+                };
+            }
+            return { x: rawX, y: rawY, rawX: rawX, rawY: rawY }; 
+        }
+        function getHoveredConnectable(rawX, rawY) { 
+            for (const comp of components) { 
+                for (const term of comp.spec.terminals) {
+                    const absPos = getAbsTerminalPos(comp, term.id);
+                    const dist = Math.sqrt((rawX - absPos.x)**2 + (rawY - absPos.y)**2);
+                    if (dist < terminalRadius + 3) { 
+                        return { type: 'terminal', componentId: comp.id, terminalId: term.id, absPos: absPos, item: comp };
+                    }
+                }
+            }
+            for (const node of nodes) {
+                const dist = Math.sqrt((rawX - node.x)**2 + (rawY - node.y)**2);
+                if (dist < nodeRadius + 3) {
+                    return { type: 'node', id: node.id, absPos: {x: node.x, y: node.y}, item: node };
+                }
+            }
+            return null;
+        }
+        
+        function getClickedComponent(rawX, rawY) { 
+             for (let i = components.length - 1; i >= 0; i--) {
+                const comp = components[i];
+                const angleRad = -comp.rotation * Math.PI / 180; 
+                const cosA = Math.cos(angleRad);
+                const sinA = Math.sin(angleRad);
+
+                const localX = rawX - comp.x;
+                const localY = rawY - comp.y;
+
+                const unrotX = localX * cosA - localY * sinA;
+                const unrotY = localX * sinA + localY * cosA;
+
+                if (unrotX >= -comp.spec.width/2 && unrotX <= comp.spec.width/2 &&
+                    unrotY >= -comp.spec.height/2 && unrotY <= comp.spec.height/2) {
+                    return comp; 
+                }
+            }
+            return null;
+        }
+        
+        function getClickedItem(rawX, rawY) {
+            const comp = getClickedComponent(rawX, rawY);
+            if (comp) return comp; 
+
+            for (const nodeItem of nodes) {
+                const dist = Math.sqrt((rawX - nodeItem.x)**2 + (rawY - nodeItem.y)**2);
+                if (dist < nodeRadius + 3) {
+                    return nodeItem; 
+                }
+            }
+            return null;
+        }
+
+
+        canvas.addEventListener('mousemove', (evt) => { 
+            const { rawX, rawY } = getMousePos(evt, false); 
+            hoveredConnectable = getHoveredConnectable(rawX, rawY);
+            
+            canvas.classList.remove('selectable', 'dragging');
+            if (selectedTool === 'select' && (getClickedItem(rawX, rawY) || hoveredConnectable)) {
+                 canvas.classList.add('selectable');
+            }
+            if (draggingItem) {
+                 canvas.classList.add('dragging');
+            }
+
+            if (wiringState.active) {
+                wiringState.currentEndPoint = {x: rawX, y: rawY};
+            } else if (draggingItem) {
+                const mousePos = getMousePos(evt); 
+                draggingItem.x = mousePos.x - dragStartOffset.x;
+                draggingItem.y = mousePos.y - dragStartOffset.y;
+                updateConnectedWires(draggingItem); 
+            }
+            redrawCanvas();
+        });
+
+        canvas.addEventListener('mousedown', (evt) => { 
+            const { x, y, rawX, rawY } = getMousePos(evt); 
+            const clickedConnectable = getHoveredConnectable(rawX, rawY);
+
+            if (evt.button !== 0) return;
+
+            if (selectedTool === 'wire') {
+                if (!wiringState.active) { 
+                    if (clickedConnectable) {
+                        wiringState.active = true;
+                        wiringState.startItem = clickedConnectable; 
+                        wiringState.points = [clickedConnectable.absPos];
+                        wiringState.currentEndPoint = {x: rawX, y: rawY};
+                    }
+                } else { 
+                    if (clickedConnectable) { 
+                        const startIsNode = wiringState.startItem.type === 'node';
+                        const endIsNode = clickedConnectable.type === 'node';
+                        
+                        let startIdVal, endIdVal;
+                        if (startIsNode) startIdVal = wiringState.startItem.id;
+                        else startIdVal = wiringState.startItem.componentId + "_" + wiringState.startItem.terminalId;
+
+                        if (endIsNode) endIdVal = clickedConnectable.id;
+                        else endIdVal = clickedConnectable.componentId + "_" + clickedConnectable.terminalId;
+
+
+                        if (startIdVal !== endIdVal) {
+                            wiringState.points.push(clickedConnectable.absPos);
+                            wires.push({
+                                id: `w${nextItemId++}`,
+                                from: JSON.parse(JSON.stringify(wiringState.startItem)), 
+                                to: JSON.parse(JSON.stringify(clickedConnectable)),     
+                                points: [...wiringState.points] 
+                            });
+                            wiringState.active = false; wiringState.points = [];
+                            simulateCircuit();
+                        } else { 
+                           console.warn("Invalid wire end (cannot connect to self).");
+                           wiringState.active = false; wiringState.points = []; 
+                        }
+                    } else { 
+                        wiringState.points.push({x: x, y: y}); 
+                        wiringState.currentEndPoint = {x: rawX, y: rawY};
+                    }
+                }
+            } else if (selectedTool === 'Node') {
+                const newNode = { 
+                    id: `n${nextItemId++}`, 
+                    itemType: 'node', 
+                    x: x, y: y
+                };
+                nodes.push(newNode);
+                selectedItem = newNode; 
+                updatePropertiesPanel();
+                setActiveTool('select'); 
+            } else if (componentSpecs[selectedTool]) { 
+                const spec = componentSpecs[selectedTool];
+                const newComp = {
+                    id: `${selectedTool.charAt(0)}${nextItemId++}`,
+                    itemType: 'component', 
+                    type: selectedTool,
+                    x: x, y: y, 
+                    rotation: 0,
+                    value: spec.defaultValue,
+                    spec: spec,
+                    state: spec.defaultState ? JSON.parse(JSON.stringify(spec.defaultState)) : {}, 
+                    brightness: 0, 
+                    voltageDrop: 0 
+                };
+                components.push(newComp);
+                selectedItem = newComp; 
+                updatePropertiesPanel();
+                setActiveTool('select'); 
+            } else if (selectedTool === 'select') { 
+                const itemUnderMouse = getClickedItem(rawX, rawY);
+                // console.log("Mousedown select, itemUnderMouse:", itemUnderMouse); // DEBUG
+                
+                if (itemUnderMouse) {
+                    selectedItem = itemUnderMouse; 
+                    draggingItem = selectedItem;   
+                    
+                    if (draggingItem) { 
+                        dragStartOffset.x = x - draggingItem.x; 
+                        dragStartOffset.y = y - draggingItem.y;
+                        canvas.classList.add('dragging');
+                    }
+                } else {
+                    selectedItem = null;
+                    draggingItem = null;
+                }
+                updatePropertiesPanel(); 
+            }
+            redrawCanvas();
+        });
+        canvas.addEventListener('mouseup', () => { 
+            if (draggingItem) {
+                draggingItem = null; 
+                canvas.classList.remove('dragging');
+                simulateCircuit(); 
+                redrawCanvas();
+            }
+        });
+        canvas.addEventListener('dblclick', (evt) => { 
+            const { rawX, rawY } = getMousePos(evt, false);
+            const item = getClickedItem(rawX, rawY); 
+            if(item && item.itemType === 'component' && selectedTool === 'select') { 
+                selectedItem = item; 
+                updatePropertiesPanel(); 
+                if (selectedItem.type !== 'Ammeter' && selectedItem.type !== 'Voltmeter' && selectedItem.type !== 'Switch' && selectedItem.type !== 'Ground') {
+                    document.getElementById('prop-value').focus();
+                    document.getElementById('prop-value').select();
+                }
+            } else if (item && item.itemType === 'node' && selectedTool === 'select') {
+                selectedItem = item;
+                updatePropertiesPanel();
+            }
+        });
+
+        function updateConnectedWires(movedItem) { 
+            wires.forEach(wire => {
+                let changed = false;
+                if (wire.from.type === movedItem.itemType && 
+                    ( (movedItem.itemType === 'node' && wire.from.id === movedItem.id) ||
+                      (movedItem.itemType === 'component' && wire.from.componentId === movedItem.id) ) ) { 
+                    wire.points[0] = (movedItem.itemType === 'component') ? 
+                                     getAbsTerminalPos(movedItem, wire.from.terminalId) : 
+                                     {x: movedItem.x, y: movedItem.y};
+                    changed = true;
+                }
+                if (wire.to.type === movedItem.itemType && 
+                    ( (movedItem.itemType === 'node' && wire.to.id === movedItem.id) ||
+                      (movedItem.itemType === 'component' && wire.to.componentId === movedItem.id) ) ) { 
+                    wire.points[wire.points.length - 1] = (movedItem.itemType === 'component') ?
+                                                          getAbsTerminalPos(movedItem, wire.to.terminalId) :
+                                                          {x: movedItem.x, y: movedItem.y};
+                    changed = true;
+                }
+
+                if (changed && electrons.length > 0 && !draggingItem) {
+                     initElectronsForLoop(); 
+                }
+            });
+        }
+        function deleteSelected() { 
+            if (!selectedItem) return;
+            if (selectedItem.itemType === 'component') {
+                components = components.filter(c => c.id !== selectedItem.id);
+                wires = wires.filter(w => !( (w.from.type === 'terminal' && w.from.componentId === selectedItem.id) ||
+                                             (w.to.type === 'terminal' && w.to.componentId === selectedItem.id) ));
+            } else if (selectedItem.itemType === 'node') {
+                nodes = nodes.filter(n => n.id !== selectedItem.id);
+                wires = wires.filter(w => !( (w.from.type === 'node' && w.from.id === selectedItem.id) ||
+                                             (w.to.type === 'node' && w.to.id === selectedItem.id) ));
+            }
+            selectedItem = null;
+            electrons = [];
+            updatePropertiesPanel();
+            simulateCircuit();
+            redrawCanvas();
+        }
+
+        // --- Properties Panel ---
+        const propIdInput = document.getElementById('prop-id');
+        const propValueInput = document.getElementById('prop-value');
+        const propUnitSpan = document.getElementById('prop-unit');
+        const propRotateBtn = document.getElementById('prop-rotate');
+        const noSelectionText = document.getElementById('noSelectionText');
+        const selectedItemPropsDiv = document.getElementById('selectedItemProps');
+        const componentSpecificPropsDiv = document.getElementById('componentSpecificProps');
+        const nodeSpecificPropsDiv = document.getElementById('nodeSpecificProps');
+        const switchSpecificPropsDiv = document.getElementById('switchSpecificProps');
+        const propSwitchToggleBtn = document.getElementById('prop-switch-toggle');
+        const meterSpecificPropsDiv = document.getElementById('meterSpecificProps');
+        const meterReadingCode = document.getElementById('meter-reading');
+
+
+        function updatePropertiesPanel() {
+            if (selectedItem) {
+                noSelectionText.style.display = 'none';
+                selectedItemPropsDiv.style.display = 'block';
+                propIdInput.value = selectedItem.id;
+
+                componentSpecificPropsDiv.style.display = 'none';
+                nodeSpecificPropsDiv.style.display = 'none';
+                switchSpecificPropsDiv.style.display = 'none';
+                meterSpecificPropsDiv.style.display = 'none';
+
+
+                if (selectedItem.itemType === 'component') {
+                    componentSpecificPropsDiv.style.display = 'block';
+                    propValueInput.value = selectedItem.value;
+                    propUnitSpan.textContent = selectedItem.spec.unit;
+                    propValueInput.disabled = selectedItem.type === 'Ground' || selectedItem.type === 'Switch' || selectedItem.type === 'Ammeter' || selectedItem.type === 'Voltmeter';
+                    propRotateBtn.style.display = 'block';
+
+                    if (selectedItem.type === 'Switch') {
+                        switchSpecificPropsDiv.style.display = 'block';
+                        propSwitchToggleBtn.textContent = selectedItem.state.isOpen ? 'Close Switch' : 'Open Switch';
+                        propSwitchToggleBtn.classList.toggle('toggle-active', !selectedItem.state.isOpen);
+
+                    }
+                    if (selectedItem.type === 'Ammeter' || selectedItem.type === 'Voltmeter') {
+                        meterSpecificPropsDiv.style.display = 'block';
+                        meterReadingCode.textContent = `${formatValue(selectedItem.state.reading, selectedItem.spec.unit)}${selectedItem.spec.unit}`;
+                    }
+
+                } else if (selectedItem.itemType === 'node') {
+                    nodeSpecificPropsDiv.style.display = 'block';
+                }
+            } else {
+                noSelectionText.style.display = 'block';
+                selectedItemPropsDiv.style.display = 'none';
+            }
+        }
+        propValueInput.addEventListener('change', (evt) => { 
+            if (selectedItem && selectedItem.itemType === 'component') {
+                const val = parseFloat(evt.target.value);
+                if (!isNaN(val)) {
+                    selectedItem.value = val; 
+                    simulateCircuit(); 
+                    redrawCanvas();
+                }
+            }
+        });
+        propRotateBtn.addEventListener('click', () => { 
+            if (selectedItem && selectedItem.itemType === 'component') {
+                selectedItem.rotation = (selectedItem.rotation + 90) % 360;
+                updateConnectedWires(selectedItem); 
+                simulateCircuit(); 
+                redrawCanvas();
+            }
+        });
+        propSwitchToggleBtn.addEventListener('click', () => { 
+            if (selectedItem && selectedItem.type === 'Switch') {
+                selectedItem.state.isOpen = !selectedItem.state.isOpen;
+                updatePropertiesPanel(); 
+                simulateCircuit();
+                redrawCanvas();
+            }
+        });
+
+
+        function formatValue(value, unit) { 
+            if (value === undefined || value === null || isNaN(value)) return "N/A";
+            if (unit === 'F') {
+                if (Math.abs(value) >= 1e-3 && Math.abs(value) < 1) return (value * 1e3).toPrecision(3) + 'm'; 
+                if (Math.abs(value) >= 1e-6 && Math.abs(value) < 1e-3) return (value * 1e6).toPrecision(3) + 'μ'; 
+                if (Math.abs(value) >= 1e-9 && Math.abs(value) < 1e-6) return (value * 1e9).toPrecision(3) + 'n'; 
+                if (Math.abs(value) >= 1e-12 && Math.abs(value) < 1e-9) return (value * 1e12).toPrecision(3) + 'p'; 
+            } else if (unit === 'Ω') {
+                if (value >= 1e6) return (value / 1e6).toPrecision(3) + 'M'; 
+                if (value >= 1e3) return (value / 1e3).toPrecision(3) + 'k'; 
+            } else if (unit === 'A') {
+                 if (Math.abs(value) < 1e-6 && value !== 0) return (value * 1e9).toPrecision(3) + 'n';
+                 if (Math.abs(value) < 1e-3 && value !== 0) return (value * 1e6).toPrecision(3) + 'μ';
+                 if (Math.abs(value) < 1 && value !== 0) return (value * 1e3).toPrecision(3) + 'm';
+            } else if (unit === 'V') {
+                 if (Math.abs(value) < 1e-3 && value !== 0) return (value * 1e6).toPrecision(3) + 'μ';
+                 if (Math.abs(value) < 1 && value !== 0) return (value * 1e3).toPrecision(3) + 'm';
+            }
+            if (value === 0) return "0.00";
+            if (Number.isInteger(value) && Math.abs(value) < 10000 && Math.abs(value) > 0.001 ) return value.toFixed(2); 
+            return value.toPrecision(3); 
+        }
+
+
+        // --- Keyboard Shortcuts --- 
+        document.addEventListener('keydown', (evt) => {
+            if (document.activeElement === propValueInput || document.activeElement.tagName === 'INPUT') return; 
+
+            switch(evt.key.toLowerCase()) {
+                case 'v': setActiveTool('select'); break;
+                case 'w': setActiveTool('wire'); break;
+                case 'j': setActiveTool('Node'); break; 
+                case 'r': 
+                    if (selectedItem && selectedItem.itemType === 'component') { 
+                        selectedItem.rotation = (selectedItem.rotation + 90) % 360;
+                        updateConnectedWires(selectedItem);
+                        simulateCircuit();
+                        redrawCanvas();
+                    }
+                    break;
+                case 'delete': case 'backspace':
+                    deleteSelected();
+                    break;
+                case 'escape':
+                    if (wiringState.active) {
+                        wiringState.active = false; wiringState.points = [];
+                        redrawCanvas();
+                    } else if (selectedTool !== 'select') {
+                        setActiveTool('select');
+                    } else {
+                        selectedItem = null; draggingItem = null;
+                        updatePropertiesPanel(); redrawCanvas();
+                    }
+                    break;
+            }
+        });
+
+        // --- Simulation Logic ---
+        const simCurrentDisplay = document.getElementById('sim-current');
+        const simStatusDisplay = document.getElementById('sim-status');
+        const componentVoltagesDiv = document.getElementById('component-voltages');
+
+        function getActualComponentById(id) { return components.find(c => c.id === id); }
+        function getActualNodeById(id) { return nodes.find(n => n.id === id); }
+
+
+        function simulateCircuit() { 
+            components.forEach(c => { 
+                c.voltageDrop = 0; 
+                if (c.type === 'LED') c.brightness = 0; 
+                if (c.type === 'Ammeter' || c.type === 'Voltmeter') c.state.reading = 0;
+            });
+            electrons = [];
+            componentPositions.pathSegments = [];
+
+            const sources = components.filter(c => c.type === 'VSource');
+            if (sources.length !== 1) {
+                simStatusDisplay.textContent = sources.length === 0 ? "No voltage source." : "Multi-source not supported by this simple solver.";
+                simCurrentDisplay.textContent = "N/A"; componentVoltagesDiv.innerHTML = "";
+                redrawCanvas(); updatePropertiesPanel(); return; 
+            }
+            const sourceComponent = sources[0]; 
+            
+            let pathData = []; 
+            let visitedWireIds = new Set();
+            let totalResistance = 0;
+            let totalLedVf = 0;
+            let capacitorInPath = false;
+            let openSwitchInPath = false;
+            let pathAmmeters = []; 
+            
+            let currentConnectable = { type: 'terminal', componentId: sourceComponent.id, terminalId: 'p', item: sourceComponent };
+            const loopPathForElectrons = []; 
+
+            for (let i = 0; i < (components.length + nodes.length + wires.length) * 3 + 20; i++) { 
+                const pathEntryKey = currentConnectable.type === 'terminal' ? 
+                                     `${currentConnectable.item.id}-${currentConnectable.terminalId}` : 
+                                     currentConnectable.item.id; 
+
+                const isCompletingLoopAtSource = currentConnectable.type === 'terminal' &&
+                                                 currentConnectable.item.id === sourceComponent.id &&
+                                                 currentConnectable.terminalId === 'n';
+                
+                if (pathData.some(pd => pd.entryKey === pathEntryKey) && !isCompletingLoopAtSource) {
+                     simStatusDisplay.textContent = "Error: Premature loop or short circuit identified.";
+                     console.warn("Premature loop at:", pathEntryKey, "Path Keys:", pathData.map(p=>p.entryKey));
+                     redrawCanvas(); updatePropertiesPanel(); return;
+                }
+                pathData.push({ entryKey: pathEntryKey, itemRef: currentConnectable.item }); 
+
+                if (currentConnectable.type === 'terminal') {
+                    const comp = currentConnectable.item; 
+                    if (comp.type === 'Resistor') totalResistance += comp.value;
+                    else if (comp.type === 'LED') totalLedVf += comp.value;
+                    else if (comp.type === 'Capacitor') capacitorInPath = true;
+                    else if (comp.type === 'Switch' && comp.state.isOpen) openSwitchInPath = true;
+                    else if (comp.type === 'Ammeter') pathAmmeters.push(comp);
+                }
+
+                const outWire = wires.find(w => !visitedWireIds.has(w.id) && 
+                    ((w.from.type === currentConnectable.type && 
+                      (w.from.type === 'node' ? w.from.id === currentConnectable.item.id : (w.from.componentId === currentConnectable.item.id && w.from.terminalId === currentConnectable.terminalId))) ||
+                     (w.to.type === currentConnectable.type && 
+                      (w.to.type === 'node' ? w.to.id === currentConnectable.item.id : (w.to.componentId === currentConnectable.item.id && w.to.terminalId === currentConnectable.terminalId)))
+                    ));
+                
+                if (!outWire) { 
+                    simStatusDisplay.textContent = `Circuit not closed (wire missing from ${pathEntryKey}).`; 
+                    redrawCanvas(); updatePropertiesPanel(); return; 
+                }
+                visitedWireIds.add(outWire.id);
+
+                let nextConnectableRaw, wirePointsToAdd;
+                const currentIsFrom = outWire.from.type === currentConnectable.type &&
+                                   (outWire.from.type === 'node' ? outWire.from.id === currentConnectable.item.id : 
+                                       (outWire.from.componentId === currentConnectable.item.id && outWire.from.terminalId === currentConnectable.terminalId));
+
+                if (currentIsFrom) {
+                    nextConnectableRaw = outWire.to;
+                    wirePointsToAdd = [...outWire.points];
+                } else {
+                    nextConnectableRaw = outWire.from;
+                    wirePointsToAdd = [...outWire.points].reverse();
+                }
+                
+                for(let j=0; j < wirePointsToAdd.length - 1; j++) {
+                    loopPathForElectrons.push({start: wirePointsToAdd[j], end: wirePointsToAdd[j+1], wire: true});
+                }
+
+                currentConnectable = { ...nextConnectableRaw }; 
+                if (currentConnectable.type === 'terminal') {
+                    currentConnectable.item = getActualComponentById(currentConnectable.componentId);
+                } else { 
+                    currentConnectable.item = getActualNodeById(currentConnectable.id);
+                }
+                if (!currentConnectable.item) { simStatusDisplay.textContent = "Error: Broken connection (item not found for next step)."; redrawCanvas(); updatePropertiesPanel(); return; }
+
+                if (currentConnectable.type === 'terminal' &&
+                    currentConnectable.item.itemType === 'component' && 
+                    currentConnectable.item.type !== 'Ground' && 
+                    !(currentConnectable.item.id === sourceComponent.id && currentConnectable.terminalId === 'n')) {
+                    
+                    const compForPath = currentConnectable.item;
+                    const entryTermPos = getAbsTerminalPos(compForPath, currentConnectable.terminalId);
+                    const exitTermSpec = compForPath.spec.terminals && compForPath.spec.terminals.find(t => t.id !== currentConnectable.terminalId);
+
+
+                    if (exitTermSpec) {
+                        const exitTermPos = getAbsTerminalPos(compForPath, exitTermSpec.id);
+                        if (compForPath.type !== 'Voltmeter') { 
+                           loopPathForElectrons.push({start: entryTermPos, end: exitTermPos, component: compForPath});
+                        }
+                        currentConnectable = { type: 'terminal', componentId: compForPath.id, terminalId: exitTermSpec.id, item: compForPath };
+                    } else if (compForPath.spec.terminals && compForPath.spec.terminals.length > 1) { 
+                         simStatusDisplay.textContent = `Error: Component path definition error for ${compForPath.id}. Missing exit terminal.`; redrawCanvas(); updatePropertiesPanel(); return;
+                    }
+                }
+
+                if (currentConnectable.type === 'terminal' && currentConnectable.item.id === sourceComponent.id && currentConnectable.terminalId === 'n') break; 
+                if (currentConnectable.type === 'terminal' && currentConnectable.item.type === 'Ground') break; 
+            }
+            
+            const loopCompleted = (currentConnectable.type === 'terminal' && currentConnectable.item.id === sourceComponent.id && currentConnectable.terminalId === 'n') || 
+                                  (currentConnectable.type === 'terminal' && currentConnectable.item.type === 'Ground');
+
+            if (!loopCompleted) {
+                simStatusDisplay.textContent = "Not a closed series loop to source negative or ground.";
+                simCurrentDisplay.textContent = "N/A"; componentVoltagesDiv.innerHTML = "";
+                redrawCanvas(); updatePropertiesPanel(); return;
+            }
+
+            let circuitCurrent = 0;
+            if (openSwitchInPath) {
+                circuitCurrent = 0;
+                simStatusDisplay.textContent = "OK (Switch Open)";
+            } else if (capacitorInPath) {
+                circuitCurrent = 0;
+                simStatusDisplay.textContent = "OK (Capacitor in DC path -> open)";
+            } else {
+                if (sourceComponent.value >= totalLedVf) { 
+                    if (totalResistance > 0) {
+                        circuitCurrent = (sourceComponent.value - totalLedVf) / totalResistance;
+                    } else if (sourceComponent.value - totalLedVf > 0.00001) circuitCurrent = Infinity; 
+                }
+                 simStatusDisplay.textContent = isFinite(circuitCurrent) ? "OK (Series Loop)" : (circuitCurrent === Infinity ? "Warning! Short Circuit!" : "OK (Series Loop)");
+            }
+            
+            simCurrentDisplay.textContent = formatValue(circuitCurrent, "A") + (isFinite(circuitCurrent) ? "A" : "");
+            pathAmmeters.forEach(amm => amm.state.reading = circuitCurrent);
+            componentVoltagesDiv.innerHTML = "";
+
+            pathData.forEach(pdEntry => {
+                if (pdEntry.itemRef && pdEntry.itemRef.itemType === 'component') { 
+                    const comp = pdEntry.itemRef; 
+                    if (comp.type === 'Resistor') {
+                        comp.voltageDrop = isFinite(circuitCurrent) ? circuitCurrent * comp.value : 0;
+                        componentVoltagesDiv.innerHTML += `<p>${comp.id} (R): ${formatValue(comp.voltageDrop,"V")}V</p>`;
+                    } else if (comp.type === 'LED') {
+                        if (isFinite(circuitCurrent) && circuitCurrent > 0.0001 && sourceComponent.value >= totalLedVf && !openSwitchInPath && !capacitorInPath) {
+                            comp.brightness = Math.min(1, circuitCurrent / 0.020); 
+                            comp.voltageDrop = comp.value; 
+                            componentVoltagesDiv.innerHTML += `<p>${comp.id} (LED): ${formatValue(comp.voltageDrop,"V")}V (ON)</p>`;
+                        } else {
+                            comp.brightness = 0; comp.voltageDrop = 0; 
+                            componentVoltagesDiv.innerHTML += `<p>${comp.id} (LED): ${formatValue(comp.voltageDrop,"V")}V (OFF)</p>`;
+                        }
+                    } else if (comp.type === 'Ammeter') {
+                        comp.voltageDrop = 0; 
+                        componentVoltagesDiv.innerHTML += `<p>${comp.id} (A): ${formatValue(comp.state.reading,"A")}A</p>`;
+                    }
+                    else if (comp.type === 'Switch' && comp.state.isOpen && openSwitchInPath) { 
+                        comp.voltageDrop = sourceComponent.value - totalLedVf - (isFinite(circuitCurrent) ? circuitCurrent * totalResistance : 0);
+                         componentVoltagesDiv.innerHTML += `<p>${comp.id} (SW): ${formatValue(comp.voltageDrop,"V")}V (Open)</p>`;
+                    } else if (comp.type === 'Capacitor' && capacitorInPath && circuitCurrent === 0) {
+                        comp.voltageDrop = sourceComponent.value - totalLedVf - (isFinite(circuitCurrent) ? circuitCurrent * totalResistance : 0);
+                         componentVoltagesDiv.innerHTML += `<p>${comp.id} (C): ${formatValue(comp.voltageDrop,"V")}V (Charged)</p>`;
+                    }
+                }
+            });
+            
+            components.filter(c => c.type === 'Voltmeter').forEach(vm => {
+                const wirePobj = wires.find(w => (w.to.type === 'terminal' && w.to.componentId === vm.id && w.to.terminalId === 'p') || (w.from.type === 'terminal' && w.from.componentId === vm.id && w.from.terminalId === 'p'));
+                const wireNobj = wires.find(w => (w.to.type === 'terminal' && w.to.componentId === vm.id && w.to.terminalId === 'n') || (w.from.type === 'terminal' && w.from.componentId === vm.id && w.from.terminalId === 'n'));
+
+                if (wirePobj && wireNobj) {
+                    const connectedToPraw = wirePobj.from.componentId === vm.id ? wirePobj.to : wirePobj.from;
+                    const connectedToNraw = wireNobj.from.componentId === vm.id ? wireNobj.to : wireNobj.from;
+                    
+                    if (connectedToPraw.type === 'terminal' && connectedToNraw.type === 'terminal' && connectedToPraw.componentId === connectedToNraw.componentId) {
+                        const targetComp = getActualComponentById(connectedToPraw.componentId);
+                        if (targetComp && pathData.some(pd => pd.itemRef && pd.itemRef.id === targetComp.id)) { 
+                           if (targetComp.type === 'VSource') vm.state.reading = targetComp.value;
+                           else vm.state.reading = targetComp.voltageDrop || 0;
+                        }
+                    } else {
+                        if (connectedToPraw.type === 'terminal' && connectedToPraw.componentId === sourceComponent.id && connectedToPraw.terminalId === 'p' &&
+                            ( (connectedToNraw.type === 'terminal' && connectedToNraw.componentId === sourceComponent.id && connectedToNraw.terminalId === 'n') ||
+                              (connectedToNraw.type === 'terminal' && getActualComponentById(connectedToNraw.componentId)?.type === 'Ground') ) ) {
+                            vm.state.reading = sourceComponent.value;
+                        } else if (connectedToNraw.type === 'terminal' && connectedToNraw.componentId === sourceComponent.id && connectedToNraw.terminalId === 'p' &&
+                            ( (connectedToPraw.type === 'terminal' && connectedToPraw.componentId === sourceComponent.id && connectedToPraw.terminalId === 'n') ||
+                              (connectedToPraw.type === 'terminal' && getActualComponentById(connectedToPraw.componentId)?.type === 'Ground') ) ) {
+                            vm.state.reading = -sourceComponent.value; 
+                        } else {
+                            vm.state.reading = 0; 
+                        }
+                    }
+                }
+                 componentVoltagesDiv.innerHTML += `<p>${vm.id} (V): ${formatValue(vm.state.reading,"V")}V</p>`;
+            });
+
+
+            if (isFinite(circuitCurrent) && circuitCurrent > 0.0001 && loopPathForElectrons.length > 0 && !openSwitchInPath && !capacitorInPath) {
+                 componentPositions.pathSegments = loopPathForElectrons; 
+                 initElectronsForLoop(Math.min(50, Math.floor(circuitCurrent * 1000 * 1.5))); 
+            } else {
+                componentPositions.pathSegments = [];
+            }
+            redrawCanvas();
+            updatePropertiesPanel(); 
+        }
+
+        const componentPositions = { pathSegments: [] }; 
+        function initElectronsForLoop(num=30) { 
+            electrons.length = 0;
+            if (!componentPositions.pathSegments || componentPositions.pathSegments.length === 0) return;
+
+            for (let i = 0; i < num; i++) {
+                const segmentIndex = Math.floor(Math.random() * componentPositions.pathSegments.length);
+                const segment = componentPositions.pathSegments[segmentIndex];
+                if (!segment || !segment.start || !segment.end) continue; 
+                const progress = Math.random();
+                
+                electrons.push({
+                    x: segment.start.x + (segment.end.x - segment.start.x) * progress,
+                    y: segment.start.y + (segment.end.y - segment.start.y) * progress,
+                    segmentIndex: segmentIndex,
+                    progress: progress,
+                });
+            }
+        }
+        function updateElectronsAnim(deltaTime, circuitCurrentVal) { 
+            if (circuitCurrentVal <= 0 || !isFinite(circuitCurrentVal) || electrons.length === 0 || componentPositions.pathSegments.length === 0) {
+                if (electrons.length > 0) { electrons = []; redrawCanvas(); } 
+                return;
+            }
+
+            const speed = circuitCurrentVal * electronSpeedFactor * 1000 * (deltaTime / 16); 
+
+            electrons.forEach(e => {
+                if (e.segmentIndex >= componentPositions.pathSegments.length) { 
+                     e.segmentIndex = 0; 
+                }
+                let currentSegment = componentPositions.pathSegments[e.segmentIndex];
+                if (!currentSegment || !currentSegment.start || !currentSegment.end) { 
+                     e.segmentIndex = (e.segmentIndex + 1) % componentPositions.pathSegments.length;
+                     if (componentPositions.pathSegments.length > 0) currentSegment = componentPositions.pathSegments[e.segmentIndex];
+                     else return; 
+                }
+
+                let segmentLength = Math.sqrt(Math.pow(currentSegment.end.x - currentSegment.start.x, 2) + Math.pow(currentSegment.end.y - currentSegment.start.y, 2));
+                
+                if (segmentLength < 0.01) e.progress = 1.0; 
+                else e.progress += speed / segmentLength;
+
+                while (e.progress >= 1.0 && componentPositions.pathSegments.length > 0) {
+                    e.progress -= 1.0;
+                    e.segmentIndex = (e.segmentIndex + 1) % componentPositions.pathSegments.length;
+                    currentSegment = componentPositions.pathSegments[e.segmentIndex];
+                     if (!currentSegment || !currentSegment.start || !currentSegment.end) { 
+                         if (componentPositions.pathSegments.length > 0) e.segmentIndex = 0; 
+                         else return; 
+                     }
+                    segmentLength = Math.sqrt(Math.pow(currentSegment.end.x - currentSegment.start.x, 2) + Math.pow(currentSegment.end.y - currentSegment.start.y, 2));
+                    if (segmentLength < 0.01) e.progress = 1.0;
+                }
+                
+                if (currentSegment && currentSegment.start && currentSegment.end) { 
+                    e.x = currentSegment.start.x + (currentSegment.end.x - currentSegment.start.x) * e.progress;
+                    e.y = currentSegment.start.y + (currentSegment.end.y - currentSegment.start.y) * e.progress;
+                }
+            });
+        }
+        let lastTime = 0;
+        function animationLoop(timestamp) { 
+            const deltaTime = timestamp - lastTime;
+            lastTime = timestamp;
+
+            let currentValForAnim = 0;
+            const currentText = simCurrentDisplay.textContent; 
+            if (currentText && currentText.includes("mA")) currentValForAnim = parseFloat(currentText.replace('mA','').trim()) / 1000; 
+            else if (currentText && currentText.includes("μA")) currentValForAnim = parseFloat(currentText.replace('μA','').trim()) / 1e6;
+            else if (currentText && currentText.includes("nA")) currentValForAnim = parseFloat(currentText.replace('nA','').trim()) / 1e9;
+            else if (currentText && currentText.includes("A") && !currentText.includes("N/A")) currentValForAnim = parseFloat(currentText.replace('A','').trim());
+            
+            updateElectronsAnim(deltaTime || 16, currentValForAnim);
+            redrawCanvas(); 
+            requestAnimationFrame(animationLoop);
+        }
+
+        // --- Initial Setup ---
+        setActiveTool('select');
+        updatePropertiesPanel();
+        redrawCanvas();
+        animationLoop(0);
+
+    </script>
+</body>
+</html>
